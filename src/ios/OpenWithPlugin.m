@@ -212,14 +212,14 @@ static NSDictionary* launchOptions = nil;
     }
 
     [self.userDefaults synchronize];
-    NSObject *object = [self.userDefaults objectForKey:@"image"];
+    NSObject *object = [self.userDefaults objectForKey:@"shared"];
     if (object == nil) {
         [self debug:@"[checkForFileToShare] Nothing to share"];
         return;
     }
 
     // Clean-up the object, assume it's been handled from now, prevent double processing
-    [self.userDefaults removeObjectForKey:@"image"];
+    [self.userDefaults removeObjectForKey:@"shared"];
 
     // Extract sharing data, make sure that it is valid
     if (![object isKindOfClass:[NSDictionary class]]) {
@@ -227,44 +227,48 @@ static NSDictionary* launchOptions = nil;
         return;
     }
     NSDictionary *dict = (NSDictionary*)object;
-    NSData *data = dict[@"data"];
+
     NSString *text = dict[@"text"];
-    NSString *name = dict[@"name"];
+    NSArray *items = dict[@"items"];
     self.backURL = dict[@"backURL"];
-    NSString *type = [self mimeTypeFromUti:dict[@"uti"]];
-    if (![data isKindOfClass:NSData.class] || ![text isKindOfClass:NSString.class]) {
-        [self debug:@"[checkForFileToShare] Data content is invalid"];
-        return;
-    }
-    NSArray *utis = dict[@"utis"];
-    if (utis == nil) {
-        utis = @[];
-    }
 
-    // TODO: add the backURL to the shared intent, put it aside in the plugin
-    // TODO: implement cordova.openwith.exit(intent), will check if backURL is set
+    NSArray *processedItems = [self processSharedItems:items];
 
-    // Send to javascript
-    [self debug:[NSString stringWithFormat:
-        @"[checkForFileToShare] Sharing text \"%@\" and a %d bytes image",
-        text, data.length]];
-
-    NSString *uri = [NSString stringWithFormat: @"shareextension://index=0,name=%@,type=%@",
-        name, type];
     CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsDictionary:@{
-        @"action": @"SEND",
-        @"exit": @YES,
-        @"items": @[@{
-            @"text" : text,
-            @"base64": [data convertToBase64],
-            @"type": type,
-            @"utis": utis,
-            @"uri": uri,
-            @"name": name
-        }]
+        @"text": text,
+        @"items": processedItems
     }];
+
     pluginResult.keepCallback = [NSNumber numberWithBool:YES];
     [self.commandDelegate sendPluginResult:pluginResult callbackId:self.handlerCallback];
+}
+
+- (NSMutableArray*) processSharedItems:(NSArray*)items {
+    NSMutableArray *processedItems = [[NSMutableArray alloc] init];
+    for (NSDictionary *item in items) {
+        NSMutableDictionary *processedItem = [NSMutableDictionary dictionaryWithDictionary:item];
+        NSData *content = item[@"data"];
+        NSString *fileName = item[@"name"];
+        // if ([item[@"data"] isKindOfClass:[NSData class]]) {
+            // If shared data, save it to the temp directory and return the saved file path to cordova.
+            NSURL *tempDirURL = [NSURL fileURLWithPath:NSTemporaryDirectory() isDirectory:YES];
+            NSURL *fileURL = [tempDirURL URLByAppendingPathComponent:fileName];
+            [content writeToFile:[fileURL path] atomically:YES];
+            NSLog(@"Saved file URL: %@", [fileURL path]);
+            [processedItem setValue:fileURL.absoluteString forKeyPath:@"data"];
+        // }
+        [processedItems addObject:processedItem];
+    }
+    return processedItems;
+}
+
+- (void) setLoggedInStatus:(CDVInvokedUrlCommand*)command {
+    BOOL value = [command argumentAtIndex:0];
+    [self.userDefaults setBool:value forKey:@"loggedIn"];
+    [self.userDefaults synchronize];
+    [self debug:[NSString stringWithFormat:@"[setLoggedInStatus] %d", value]];
+    CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
+    [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
 
 // Initialize the plugin
@@ -297,6 +301,7 @@ static NSDictionary* launchOptions = nil;
     CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
     [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
+
 
 @end
 // vim: ts=4:sw=4:et
