@@ -2,8 +2,6 @@
 //  ShareViewController.m
 //  OpenWith - Share Extension
 //
-
-//
 // The MIT License (MIT)
 //
 // Copyright (c) 2017 Jean-Christophe Hoelt
@@ -26,6 +24,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 //
+// Adjustments: LoggedIn removed, iOS13 Mail Fix, only PDFs, viewDidLoad and viewDidAppear merged to avoid Freezing after first Share
 
 #import <UIKit/UIKit.h>
 #import <Social/Social.h>
@@ -41,47 +40,47 @@
 
 @implementation NSData (Base64)
 - (NSString*)convertToBase64 {
-    const uint8_t* input = (const uint8_t*)[self bytes];
-    NSInteger length = [self length];
+  const uint8_t* input = (const uint8_t*)[self bytes];
+  NSInteger length = [self length];
 
-    static char table[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
+  static char table[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
 
-    NSMutableData* data = [NSMutableData dataWithLength:((length + 2) / 3) * 4];
-    uint8_t* output = (uint8_t*)data.mutableBytes;
+  NSMutableData* data = [NSMutableData dataWithLength:((length + 2) / 3) * 4];
+  uint8_t* output = (uint8_t*)data.mutableBytes;
 
-    NSInteger i;
-    for (i=0; i < length; i += 3) {
-        NSInteger value = 0;
-        NSInteger j;
-        for (j = i; j < (i + 3); j++) {
-            value <<= 8;
+  NSInteger i;
+  for (i=0; i < length; i += 3) {
+    NSInteger value = 0;
+    NSInteger j;
+    for (j = i; j < (i + 3); j++) {
+      value <<= 8;
 
-            if (j < length) {
-                value |= (0xFF & input[j]);
-            }
-        }
-
-        NSInteger theIndex = (i / 3) * 4;
-        output[theIndex + 0] =                    table[(value >> 18) & 0x3F];
-        output[theIndex + 1] =                    table[(value >> 12) & 0x3F];
-        output[theIndex + 2] = (i + 1) < length ? table[(value >> 6)  & 0x3F] : '=';
-        output[theIndex + 3] = (i + 2) < length ? table[(value >> 0)  & 0x3F] : '=';
+      if (j < length) {
+        value |= (0xFF & input[j]);
+      }
     }
 
-    NSString *ret = [[NSString alloc] initWithData:data encoding:NSASCIIStringEncoding];
+    NSInteger theIndex = (i / 3) * 4;
+    output[theIndex + 0] =                    table[(value >> 18) & 0x3F];
+    output[theIndex + 1] =                    table[(value >> 12) & 0x3F];
+    output[theIndex + 2] = (i + 1) < length ? table[(value >> 6)  & 0x3F] : '=';
+    output[theIndex + 3] = (i + 2) < length ? table[(value >> 0)  & 0x3F] : '=';
+  }
+
+  NSString *ret = [[NSString alloc] initWithData:data encoding:NSASCIIStringEncoding];
 #if ARC_DISABLED
-    [ret autorelease];
+  [ret autorelease];
 #endif
-    return ret;
+  return ret;
 }
 @end
 
 @interface ShareViewController : SLComposeServiceViewController <UIAlertViewDelegate> {
-    int _verbosityLevel;
-    NSUserDefaults *_userDefaults;
-    NSString *_backURL;
+  int _verbosityLevel;
+  NSUserDefaults *_userDefaults;
+  NSString *_backURL;
 
-    //- (void)sendResults
+  //- (void)sendResults
 }
 @property (nonatomic) int verbosityLevel;
 @property (nonatomic,retain) NSUserDefaults *userDefaults;
@@ -104,9 +103,9 @@
 @synthesize backURL = _backURL;
 
 - (void) log:(int)level message:(NSString*)message {
-    if (level >= self.verbosityLevel) {
-        NSLog(@"[ShareViewController.m]%@", message);
-    }
+  if (level >= self.verbosityLevel) {
+    NSLog(@"[ShareViewController.m]%@", message);
+  }
 }
 - (void) debug:(NSString*)message { [self log:VERBOSITY_DEBUG message:message]; }
 - (void) info:(NSString*)message { [self log:VERBOSITY_INFO message:message]; }
@@ -114,233 +113,258 @@
 - (void) error:(NSString*)message { [self log:VERBOSITY_ERROR message:message]; }
 
 - (void) setup {
-    self.userDefaults = [[NSUserDefaults alloc] initWithSuiteName:SHAREEXT_GROUP_IDENTIFIER];
-    self.verbosityLevel = [self.userDefaults integerForKey:@"verbosityLevel"];
-    [self debug:@"[setup]"];
+  self.userDefaults = [[NSUserDefaults alloc] initWithSuiteName:SHAREEXT_GROUP_IDENTIFIER];
+  self.verbosityLevel = [self.userDefaults integerForKey:@"verbosityLevel"];
+  [self debug:@"[setup]"];
 }
 
 - (BOOL) isContentValid {
-    return YES;
+  return YES;
 }
 
 - (void) openURL:(nonnull NSURL *)url {
-    SEL selector = NSSelectorFromString(@"openURL:");
-    UIResponder* responder = self;
-    while ((responder = [responder nextResponder]) != nil) {
-        NSLog(@"responder = %@", responder);
-        if([responder respondsToSelector:selector] == true) {
-            NSMethodSignature *methodSignature = [responder methodSignatureForSelector:selector];
-            NSInvocation *invocation = [NSInvocation invocationWithMethodSignature:methodSignature];
+  SEL selector = NSSelectorFromString(@"openURL:options:completionHandler:");
 
-            [invocation setTarget: responder];
-            [invocation setSelector: selector];
-            [invocation setArgument: &url atIndex: 2];
+  UIResponder* responder = self;
+  while ((responder = [responder nextResponder]) != nil) {
+    NSLog(@"responder = %@", responder);
 
-            [invocation invoke];
-            break;
-        }
+    if([responder respondsToSelector:selector] == true) {
+      NSMethodSignature *methodSignature = [responder methodSignatureForSelector:selector];
+      NSInvocation *invocation = [NSInvocation invocationWithMethodSignature:methodSignature];
+
+      void (^completion)(BOOL success) = ^void(BOOL success) {
+        NSLog(@"Completions block: %i", success);
+      };
+
+      if (@available(iOS 13.0, *)) { /* NEW Version for iOS 13 */
+        UISceneOpenExternalURLOptions * options = [[UISceneOpenExternalURLOptions alloc] init];
+        options.universalLinksOnly = false;
+
+        [invocation setTarget: responder];
+        [invocation setSelector: selector];
+        [invocation setArgument: &url atIndex: 2];
+        [invocation setArgument: &options atIndex:3];
+        [invocation setArgument: &completion atIndex: 4];
+        [invocation invoke];
+        break;
+      } else { /* for < iOS 13 */
+        NSDictionary<NSString *, id> *options = [NSDictionary dictionary];
+
+        [invocation setTarget: responder];
+        [invocation setSelector: selector];
+        [invocation setArgument: &url atIndex: 2];
+        [invocation setArgument: &options atIndex:3];
+        [invocation setArgument: &completion atIndex: 4];
+        [invocation invoke];
+        break;
+      }
     }
+  }
 }
 - (void) viewDidAppear:(BOOL)animated {
-    [self.view endEditing:YES];
+  [self.view endEditing:YES];
 
-    [self setup];
-    [self debug:@"[viewDidAppear]"];
+  [self setup]; // previously in viewDidLoad()
+  [self debug:@"[viewDidLoad]"]; // previously in viewDidLoad()
 
-    __block int remainingAttachments = ((NSExtensionItem*)self.extensionContext.inputItems[0]).attachments.count;
-    __block NSMutableArray *items = [[NSMutableArray alloc] init];
-    __block NSDictionary *results = @{
-        @"text" : self.contentText,
-        @"backURL": self.backURL != nil ? self.backURL : @"",
-        @"items": items,
-    };
+  __block int remainingAttachments = ((NSExtensionItem*)self.extensionContext.inputItems[0]).attachments.count;
+  __block NSMutableArray *items = [[NSMutableArray alloc] init];
+  __block NSDictionary *results = @{
+    @"text" : self.contentText,
+    @"backURL": self.backURL != nil ? self.backURL : @"",
+    @"items": items,
+  };
 
-    for (NSItemProvider* itemProvider in ((NSExtensionItem*)self.extensionContext.inputItems[0]).attachments) {
-        [self debug:[NSString stringWithFormat:@"item provider registered indentifiers = %@", itemProvider.registeredTypeIdentifiers]];
+  for (NSItemProvider* itemProvider in ((NSExtensionItem*)self.extensionContext.inputItems[0]).attachments) {
+    [self debug:[NSString stringWithFormat:@"item provider registered indentifiers = %@", itemProvider.registeredTypeIdentifiers]];
 
-        // TEXT case
-        if ([itemProvider hasItemConformingToTypeIdentifier:@"public.text"]) {
-            [itemProvider loadItemForTypeIdentifier:@"public.text" options:nil completionHandler: ^(NSString* item, NSError *error) {
-                --remainingAttachments;
-                [self debug:[NSString stringWithFormat:@"public.text  = %@", item]];
-                NSString *uti = @"public.plain-text";
-                NSDictionary *dict = @{
-                    @"text" : self.contentText,
-                    @"data" : item,
-                    @"uti": uti,
-                    @"utis": itemProvider.registeredTypeIdentifiers,
-                    @"name": @"",
-                    @"type": [self mimeTypeFromUti:uti],
-                };
-                [items addObject:dict];
-                if (remainingAttachments == 0) {
-                    [self sendResults:results];
-                }
-            }];
+      [self debug:[NSString stringWithFormat:@"item provider = %@", itemProvider]];
+//      [self debug:[NSString stringWithFormat:@"Shared File is a PDF: com.adobe.pdf"]];
+
+      /* Extra Step for iOS Mail */
+      if ([itemProvider hasItemConformingToTypeIdentifier: (NSString*) kUTTypeURL]) {
+        [itemProvider loadItemForTypeIdentifier:(NSString*) kUTTypeURL options:nil completionHandler:^(NSURL *urlItem, NSError *error) {
+          if (urlItem) {
+            --remainingAttachments;
+
+           if (urlItem != nil) {
+             [self debug:[NSString stringWithFormat:@"kUTTypeURL action, probably from iOS Mail"]];
+
+//             NSData *data = [NSData dataWithContentsOfURL:(NSURL*)urlItem];
+
+//             NSString *base64 = [data convertToBase64];
+             NSString *suggestedName = urlItem.lastPathComponent;
+
+             NSString *uti = itemProvider.registeredTypeIdentifiers[0];
+               
+             NSString *registeredType = nil;
+             if ([itemProvider.registeredTypeIdentifiers count] > 0) {
+               registeredType = itemProvider.registeredTypeIdentifiers[0];
+             } else {
+               registeredType = uti;
+             }
+
+             NSString *mimeType =  [self mimeTypeFromUti:registeredType];
+
+             NSDictionary *dict = @{
+                                    @"text" : self.contentText,
+                                    @"data" : urlItem.absoluteString,
+//                                    @"base64" : base64,
+                                    @"uti"  : uti,
+                                    @"utis" : itemProvider.registeredTypeIdentifiers,
+                                    @"name" : suggestedName,
+                                    @"type" : mimeType
+                                  };
+
+             [items addObject:dict];
+             if (remainingAttachments == 0) {
+               [self sendResults:results];
+             }
+           }
+          }
+        }];
+      }
+
+      /* Regular Import pre iOS 13 (works in ios13 with everything EXCEPT Mail */
+      [itemProvider loadItemForTypeIdentifier: itemProvider.registeredTypeIdentifiers[0] options:nil completionHandler: ^(NSURL* item, NSError *error) {
+        --remainingAttachments;
+
+        if (item != nil) {
+          [self debug:[NSString stringWithFormat:@"NSURL action, probably from something except iOS Mail"]];
+
+//          NSData *data = [NSData dataWithContentsOfURL:(NSURL*)item];
+
+//          NSString *base64 = [data convertToBase64];
+          NSString *suggestedName = item.lastPathComponent;
+//          NSLog(@"data = %@", data);
+
+          NSString *uti = itemProvider.registeredTypeIdentifiers[0];
+
+          NSString *registeredType = nil;
+          if ([itemProvider.registeredTypeIdentifiers count] > 0) {
+            registeredType = itemProvider.registeredTypeIdentifiers[0];
+          } else {
+            registeredType = uti;
+          }
+
+          NSString *mimeType =  [self mimeTypeFromUti:registeredType];
+
+          //NSLog(@"PeDeEf");
+          //NSLog(@"text = %@", self.contentText);
+          //NSLog(@"base64 = %@", base64);
+          //NSLog(@"uti = %@", uti);
+          //NSLog(@"utis = %@", itemProvider.registeredTypeIdentifiers);
+          //NSLog(@"name = %@", suggestedName);
+          //NSLog(@"mimeType = %@", mimeType);
+
+          NSDictionary *dict = @{
+                                 @"text" : self.contentText,
+                                 @"data" : item.absoluteString,
+//                                 @"base64" : base64,
+                                 @"uti"  : uti,
+                                 @"utis" : itemProvider.registeredTypeIdentifiers,
+                                 @"name" : suggestedName,
+                                 @"type" : mimeType
+                               };
+
+          [items addObject:dict];
+          if (remainingAttachments == 0) {
+            [self sendResults:results];
+          }
+        } else {
+          NSLog(@"ELSE FAIL");
+
+          [self.extensionContext completeRequestReturningItems:@[] completionHandler:nil];
         }
-
-        // IMAGE case
-        else if ([itemProvider hasItemConformingToTypeIdentifier:@"public.image"]) {
-            [itemProvider loadItemForTypeIdentifier:@"public.image" options:nil completionHandler: ^(NSURL *item, NSError *error) {
-                --remainingAttachments;
-                if (item != nil) {
-                    [self debug:[NSString stringWithFormat:@"public.image  = %@", item]];
-                    NSString *uti = @"public.image";
-                    NSString *imageName = [[item path] lastPathComponent];
-                    NSDictionary *dict = @{
-                        @"text" : self.contentText,
-                        @"data" : item.absoluteString,
-                        @"uti": uti,
-                        @"utis": itemProvider.registeredTypeIdentifiers,
-                        @"name": imageName,
-                        @"type": [self mimeTypeFromUti:uti],
-                    };
-                    [items addObject:dict];
-                }
-
-                if (remainingAttachments == 0) {
-                    [self sendResults:results];
-                }
-            }];
-        }
-
-        // Other files
-        else {
-            __block NSString *uti = itemProvider.registeredTypeIdentifiers[0];
-            [itemProvider loadItemForTypeIdentifier:uti options:nil completionHandler: ^(id<NSSecureCoding> item, NSError *error) {
-
-                NSString *baseUti = nil;
-                if (
-                    UTTypeConformsTo((__bridge CFStringRef _Nonnull)uti, kUTTypeAudiovisualContent)
-                    ) {
-                    baseUti = @"public.audiovisual-content";
-                    // @todo: make resize
-                }
-                else if ( UTTypeConformsTo((__bridge CFStringRef _Nonnull)uti,kUTTypeAudio)) {
-                    baseUti = @"public.audio";
-                }
-                else if ( UTTypeConformsTo((__bridge CFStringRef _Nonnull)uti,kUTTypeURL)) {
-                    baseUti = @"public.url";
-                }
-                else if ( UTTypeConformsTo((__bridge CFStringRef _Nonnull)uti,kUTTypeFileURL)) {
-                    baseUti = @"public.file-url";
-                }
-                else {
-                    baseUti = uti;
-                }
-                [self debug:[NSString stringWithFormat:@"%@ = %@", baseUti, item]];
-
-                __block NSURL *fileUrl = item;
-
-                if (fileUrl != nil) {
-                    NSString *data = fileUrl.absoluteString;
-                    NSString *suggestedName = fileUrl.lastPathComponent;
-                    NSDictionary *dict = @{
-                        @"text" : self.contentText,
-                        @"data" : data,
-                        @"uti"  : baseUti,
-                        @"utis" : itemProvider.registeredTypeIdentifiers,
-                        @"name" : suggestedName,
-                        @"type" : [self mimeTypeFromUti:uti],
-                    };
-                    [items addObject:dict];
-                }
-
-                --remainingAttachments;
-                if (remainingAttachments == 0) {
-                    [self sendResults:results];
-                }
-            }];
-        }
-    }
+      }];
+  }
 }
 
 - (void) sendResults: (NSDictionary*)results {
-    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0), ^{
-        [self.userDefaults setObject:results forKey:@"shared"];
-        [self.userDefaults synchronize];
+  [self.userDefaults setObject:results forKey:@"shared"];
+  [self.userDefaults synchronize];
 
-        // Emit a URL that opens the cordova app
-        NSString *url = [NSString stringWithFormat:@"%@://shared", SHAREEXT_URL_SCHEME];
+  // Emit a URL that opens the cordova app
+  NSString *url = [NSString stringWithFormat:@"%@://shared", SHAREEXT_URL_SCHEME];
 
-        [self openURL:[NSURL URLWithString:url]];
+  [self openURL:[NSURL URLWithString:url]];
 
-        // Shut down the extension
-        [self.extensionContext completeRequestReturningItems:@[] completionHandler:nil];
-    });
+  // Shut down the extension
+  [self.extensionContext completeRequestReturningItems:@[] completionHandler:nil];
 }
 
-- (void) didSelectPost {
-    [self debug:@"[didSelectPost]"];
-}
+ - (void) didSelectPost {
+   [self debug:@"[didSelectPost]"];
+ }
 
 - (NSArray*) configurationItems {
-    // To add configuration options via table cells at the bottom of the sheet, return an array of SLComposeSheetConfigurationItem here.
-    return @[];
+  // To add configuration options via table cells at the bottom of the sheet, return an array of SLComposeSheetConfigurationItem here.
+  return @[];
 }
 
 - (NSString*) backURLFromBundleID: (NSString*)bundleId {
-    if (bundleId == nil) return nil;
-    // App Store - com.apple.AppStore
-    if ([bundleId isEqualToString:@"com.apple.AppStore"]) return @"itms-apps://";
-    // Calculator - com.apple.calculator
-    // Calendar - com.apple.mobilecal
-    // Camera - com.apple.camera
-    // Clock - com.apple.mobiletimer
-    // Compass - com.apple.compass
-    // Contacts - com.apple.MobileAddressBook
-    // FaceTime - com.apple.facetime
-    // Find Friends - com.apple.mobileme.fmf1
-    // Find iPhone - com.apple.mobileme.fmip1
-    // Game Center - com.apple.gamecenter
-    // Health - com.apple.Health
-    // iBooks - com.apple.iBooks
-    // iTunes Store - com.apple.MobileStore
-    // Mail - com.apple.mobilemail - message://
-    if ([bundleId isEqualToString:@"com.apple.mobilemail"]) return @"message://";
-    // Maps - com.apple.Maps - maps://
-    if ([bundleId isEqualToString:@"com.apple.Maps"]) return @"maps://";
-    // Messages - com.apple.MobileSMS
-    // Music - com.apple.Music
-    // News - com.apple.news - applenews://
-    if ([bundleId isEqualToString:@"com.apple.news"]) return @"applenews://";
-    // Notes - com.apple.mobilenotes - mobilenotes://
-    if ([bundleId isEqualToString:@"com.apple.mobilenotes"]) return @"mobilenotes://";
-    // Phone - com.apple.mobilephone
-    // Photos - com.apple.mobileslideshow
-    if ([bundleId isEqualToString:@"com.apple.mobileslideshow"]) return @"photos-redirect://";
-    // Podcasts - com.apple.podcasts
-    // Reminders - com.apple.reminders - x-apple-reminder://
-    if ([bundleId isEqualToString:@"com.apple.reminders"]) return @"x-apple-reminder://";
-    // Safari - com.apple.mobilesafari
-    // Settings - com.apple.Preferences
-    // Stocks - com.apple.stocks
-    // Tips - com.apple.tips
-    // Videos - com.apple.videos - videos://
-    if ([bundleId isEqualToString:@"com.apple.videos"]) return @"videos://";
-    // Voice Memos - com.apple.VoiceMemos - voicememos://
-    if ([bundleId isEqualToString:@"com.apple.VoiceMemos"]) return @"voicememos://";
-    // Wallet - com.apple.Passbook
-    // Watch - com.apple.Bridge
-    // Weather - com.apple.weather
-    return nil;
+  if (bundleId == nil) return nil;
+  // App Store - com.apple.AppStore
+  if ([bundleId isEqualToString:@"com.apple.AppStore"]) return @"itms-apps://";
+  // Calculator - com.apple.calculator
+  // Calendar - com.apple.mobilecal
+  // Camera - com.apple.camera
+  // Clock - com.apple.mobiletimer
+  // Compass - com.apple.compass
+  // Contacts - com.apple.MobileAddressBook
+  // FaceTime - com.apple.facetime
+  // Find Friends - com.apple.mobileme.fmf1
+  // Find iPhone - com.apple.mobileme.fmip1
+  // Game Center - com.apple.gamecenter
+  // Health - com.apple.Health
+  // iBooks - com.apple.iBooks
+  // iTunes Store - com.apple.MobileStore
+  // Mail - com.apple.mobilemail - message://
+  if ([bundleId isEqualToString:@"com.apple.mobilemail"]) return @"message://";
+  // Maps - com.apple.Maps - maps://
+  if ([bundleId isEqualToString:@"com.apple.Maps"]) return @"maps://";
+  // Messages - com.apple.MobileSMS
+  // Music - com.apple.Music
+  // News - com.apple.news - applenews://
+  if ([bundleId isEqualToString:@"com.apple.news"]) return @"applenews://";
+  // Notes - com.apple.mobilenotes - mobilenotes://
+  if ([bundleId isEqualToString:@"com.apple.mobilenotes"]) return @"mobilenotes://";
+  // Phone - com.apple.mobilephone
+  // Photos - com.apple.mobileslideshow
+  if ([bundleId isEqualToString:@"com.apple.mobileslideshow"]) return @"photos-redirect://";
+  // Podcasts - com.apple.podcasts
+  // Reminders - com.apple.reminders - x-apple-reminder://
+  if ([bundleId isEqualToString:@"com.apple.reminders"]) return @"x-apple-reminder://";
+  // Safari - com.apple.mobilesafari
+  // Settings - com.apple.Preferences
+  // Stocks - com.apple.stocks
+  // Tips - com.apple.tips
+  // Videos - com.apple.videos - videos://
+  if ([bundleId isEqualToString:@"com.apple.videos"]) return @"videos://";
+  // Voice Memos - com.apple.VoiceMemos - voicememos://
+  if ([bundleId isEqualToString:@"com.apple.VoiceMemos"]) return @"voicememos://";
+  // Wallet - com.apple.Passbook
+  // Watch - com.apple.Bridge
+  // Weather - com.apple.weather
+  return nil;
 }
 
 // This is called at the point where the Post dialog is about to be shown.
 // We use it to store the _hostBundleID
 - (void) willMoveToParentViewController: (UIViewController*)parent {
-    NSString *hostBundleID = [parent valueForKey:(@"_hostBundleID")];
-    self.backURL = [self backURLFromBundleID:hostBundleID];
+  NSString *hostBundleID = [parent valueForKey:(@"_hostBundleID")];
+  self.backURL = [self backURLFromBundleID:hostBundleID];
 }
 
 
 - (NSString *)mimeTypeFromUti: (NSString*)uti {
-    if (uti == nil) {
-        return nil;
-    }
-    CFStringRef cret = UTTypeCopyPreferredTagWithClass((__bridge CFStringRef)uti, kUTTagClassMIMEType);
-    NSString *ret = (__bridge_transfer NSString *)cret;
-    return ret == nil ? uti : ret;
+  if (uti == nil) {
+      return nil;
+  }
+  CFStringRef cret = UTTypeCopyPreferredTagWithClass((__bridge CFStringRef)uti, kUTTagClassMIMEType);
+  NSString *ret = (__bridge_transfer NSString *)cret;
+  return ret == nil ? uti : ret;
 }
 
 @end

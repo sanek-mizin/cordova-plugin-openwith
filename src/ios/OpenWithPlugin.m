@@ -3,50 +3,6 @@
 #import <MobileCoreServices/MobileCoreServices.h>
 
 /*
- * Add base64 export to NSData
- */
-@interface NSData (Base64)
-- (NSString*)convertToBase64;
-@end
-
-@implementation NSData (Base64)
-- (NSString*)convertToBase64 {
-    const uint8_t* input = (const uint8_t*)[self bytes];
-    NSInteger length = [self length];
-
-    static char table[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
-
-    NSMutableData* data = [NSMutableData dataWithLength:((length + 2) / 3) * 4];
-    uint8_t* output = (uint8_t*)data.mutableBytes;
-
-    NSInteger i;
-    for (i=0; i < length; i += 3) {
-        NSInteger value = 0;
-        NSInteger j;
-        for (j = i; j < (i + 3); j++) {
-            value <<= 8;
-
-            if (j < length) {
-                value |= (0xFF & input[j]);
-            }
-        }
-
-        NSInteger theIndex = (i / 3) * 4;
-        output[theIndex + 0] =                    table[(value >> 18) & 0x3F];
-        output[theIndex + 1] =                    table[(value >> 12) & 0x3F];
-        output[theIndex + 2] = (i + 1) < length ? table[(value >> 6)  & 0x3F] : '=';
-        output[theIndex + 3] = (i + 2) < length ? table[(value >> 0)  & 0x3F] : '=';
-    }
-
-    NSString *ret = [[NSString alloc] initWithData:data encoding:NSASCIIStringEncoding];
-#if ARC_DISABLED
-    [ret autorelease];
-#endif
-    return ret;
-}
-@end
-
-/*
  * Constants
  */
 
@@ -195,15 +151,6 @@ static NSDictionary* launchOptions = nil;
     [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
 
-- (NSString *)mimeTypeFromUti: (NSString*)uti {
-    if (uti == nil) {
-        return nil;
-    }
-    CFStringRef cret = UTTypeCopyPreferredTagWithClass((__bridge CFStringRef)uti, kUTTagClassMIMEType);
-    NSString *ret = (__bridge_transfer NSString *)cret;
-    return ret == nil ? uti : ret;
-}
-
 - (void) checkForFileToShare {
     [self debug:@"[checkForFileToShare]"];
     if (self.handlerCallback == nil) {
@@ -238,7 +185,6 @@ static NSDictionary* launchOptions = nil;
         @"text": text,
         @"items": processedItems
     }];
-
     pluginResult.keepCallback = [NSNumber numberWithBool:YES];
     [self.commandDelegate sendPluginResult:pluginResult callbackId:self.handlerCallback];
 }
@@ -262,14 +208,16 @@ static NSDictionary* launchOptions = nil;
     return processedItems;
 }
 
-- (void) setLoggedInStatus:(CDVInvokedUrlCommand*)command {
+/*
+- (void) setLoggedIn:(CDVInvokedUrlCommand*)command {
     BOOL value = [command argumentAtIndex:0];
     [self.userDefaults setBool:value forKey:@"loggedIn"];
     [self.userDefaults synchronize];
-    [self debug:[NSString stringWithFormat:@"[setLoggedInStatus] %d", value]];
+    [self debug:[NSString stringWithFormat:@"[setLoggedIn] %d", value]];
     CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
     [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
+*/
 
 // Initialize the plugin
 - (void) init:(CDVInvokedUrlCommand*)command {

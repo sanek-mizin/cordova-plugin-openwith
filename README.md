@@ -207,10 +207,10 @@ A data descriptor describe one file. It is a javascript object with the followin
  - `name`: suggested file name, generally undefined.
  - `path`: path on the device, generally undefined.
  - `utis`: list of UTIs the file belongs to (**iOS only**).
- - `base64`: a long base64 string with the content of the file.
+ - `data`: temporary path, use the readAsDataURL [cordova-plugin-file](https://github.com/apache/cordova-plugin-file) to get base64  (**iOS only**)
    - _might be undefined until `load()` has been called and completed successfully._
 
-### cordova.openwith.load(dataDescriptor, loadSuccessCallback, loadErrorCallback)
+### cordova.openwith.load(dataDescriptor, loadSuccessCallback, loadErrorCallback) (**Android only**)
 
 Load data for an item. `dataDescriptor` is an item in an intent's items list, see the section about `addHandler()` above for details.
 
