@@ -180,7 +180,7 @@
     [self debug:[NSString stringWithFormat:@"item provider registered indentifiers = %@", itemProvider.registeredTypeIdentifiers]];
 
       [self debug:[NSString stringWithFormat:@"item provider = %@", itemProvider]];
-//      [self debug:[NSString stringWithFormat:@"Shared File is a PDF: com.adobe.pdf"]];
+      //[self debug:[NSString stringWithFormat:@"Shared File is a PDF: com.adobe.pdf"]];
 
       /* Extra Step for iOS Mail */
       if ([itemProvider hasItemConformingToTypeIdentifier: (NSString*) kUTTypeURL]) {
@@ -191,14 +191,12 @@
            if (urlItem != nil) {
              [self debug:[NSString stringWithFormat:@"kUTTypeURL action, probably from iOS Mail"]];
 
-//             NSData *data = [NSData dataWithContentsOfURL:(NSURL*)urlItem];
-
-//             NSString *base64 = [data convertToBase64];
+             //NSData *data = [NSData dataWithContentsOfURL:(NSURL*)urlItem];
+             //NSString *base64 = [data convertToBase64];
              NSString *suggestedName = urlItem.lastPathComponent;
-
              NSString *uti = itemProvider.registeredTypeIdentifiers[0];
-               
              NSString *registeredType = nil;
+               
              if ([itemProvider.registeredTypeIdentifiers count] > 0) {
                registeredType = itemProvider.registeredTypeIdentifiers[0];
              } else {
@@ -206,11 +204,10 @@
              }
 
              NSString *mimeType =  [self mimeTypeFromUti:registeredType];
-
              NSDictionary *dict = @{
                                     @"text" : self.contentText,
                                     @"data" : urlItem.absoluteString,
-//                                    @"base64" : base64,
+                                    //@"base64" : base64,
                                     @"uti"  : uti,
                                     @"utis" : itemProvider.registeredTypeIdentifiers,
                                     @"name" : suggestedName,
@@ -224,8 +221,7 @@
            }
           }
         }];
-      }
-
+      } else {
       /* Regular Import pre iOS 13 (works in ios13 with everything EXCEPT Mail */
       [itemProvider loadItemForTypeIdentifier: itemProvider.registeredTypeIdentifiers[0] options:nil completionHandler: ^(NSURL* item, NSError *error) {
         --remainingAttachments;
@@ -233,15 +229,13 @@
         if (item != nil) {
           [self debug:[NSString stringWithFormat:@"NSURL action, probably from something except iOS Mail"]];
 
-//          NSData *data = [NSData dataWithContentsOfURL:(NSURL*)item];
-
-//          NSString *base64 = [data convertToBase64];
+          //NSData *data = [NSData dataWithContentsOfURL:(NSURL*)item];
+          //NSString *base64 = [data convertToBase64];
           NSString *suggestedName = item.lastPathComponent;
-//          NSLog(@"data = %@", data);
-
+          //NSLog(@"data = %@", data);
           NSString *uti = itemProvider.registeredTypeIdentifiers[0];
-
           NSString *registeredType = nil;
+            
           if ([itemProvider.registeredTypeIdentifiers count] > 0) {
             registeredType = itemProvider.registeredTypeIdentifiers[0];
           } else {
@@ -249,19 +243,10 @@
           }
 
           NSString *mimeType =  [self mimeTypeFromUti:registeredType];
-
-          //NSLog(@"PeDeEf");
-          //NSLog(@"text = %@", self.contentText);
-          //NSLog(@"base64 = %@", base64);
-          //NSLog(@"uti = %@", uti);
-          //NSLog(@"utis = %@", itemProvider.registeredTypeIdentifiers);
-          //NSLog(@"name = %@", suggestedName);
-          //NSLog(@"mimeType = %@", mimeType);
-
           NSDictionary *dict = @{
                                  @"text" : self.contentText,
                                  @"data" : item.absoluteString,
-//                                 @"base64" : base64,
+                                 // @"base64" : base64,
                                  @"uti"  : uti,
                                  @"utis" : itemProvider.registeredTypeIdentifiers,
                                  @"name" : suggestedName,
@@ -278,6 +263,7 @@
           [self.extensionContext completeRequestReturningItems:@[] completionHandler:nil];
         }
       }];
+      }      
   }
 }
 
